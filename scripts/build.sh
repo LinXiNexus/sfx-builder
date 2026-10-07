@@ -46,15 +46,20 @@ if [ "$COUNT" -eq 0 ]; then
 fi
 echo "    负载文件数：${COUNT}"
 
-# 说明文档：打包时转成 UTF-8 BOM + CRLF，老版本 Windows 记事本也能正常显示中文
+# 说明文档：转成 UTF-8 BOM + CRLF（老版本 Windows 记事本也能正常显示中文），
+# 放在 build/ 里，稍后附加进包 —— payloads/ 保持只放你自己的产物，不会被污染。
+ZIP_OUT="$ROOT/build/payload.zip"
+rm -f "$ZIP_OUT" build/使用说明.txt
 if [ -f 使用说明.txt ]; then
-  printf '\xef\xbb\xbf' > "${PAYLOAD_DIR}/使用说明.txt"
-  sed 's/$/\r/' 使用说明.txt >> "${PAYLOAD_DIR}/使用说明.txt"
+  printf '\xef\xbb\xbf' > build/使用说明.txt
+  sed 's/$/\r/' 使用说明.txt >> build/使用说明.txt
 fi
 
-rm -f build/payload.zip
-( cd "$PAYLOAD_DIR" && zip -r -X -9 ../build/payload.zip . \
+( cd "$PAYLOAD_DIR" && zip -r -X -9 "$ZIP_OUT" . \
     -x '.*' -x '*/.*' -x 'README.md' -x '*/README.md' )
+if [ -f build/使用说明.txt ]; then
+  ( cd "$ROOT/build" && zip -X -9 payload.zip 使用说明.txt >/dev/null )
+fi
 
 if command -v unzip >/dev/null 2>&1; then
   echo "    负载内容："

@@ -25,6 +25,27 @@ git tag v1.0.0 && git push origin main --tags
 
 CI 触发方式：push 到 `main`/`master` 只出构建产物；打 `v*` tag 会额外发布 GitHub Release（附 `.sha256`）。
 
+## 交互式打包向导（推荐给不记命令的人）
+
+```bash
+python3 scripts/wizard.py     # 或 make wizard
+```
+
+向导会：
+
+1. 逐个平台告诉你需要放什么（Windows 主程序是**必需项**）
+2. 你把文件**拖进终端**即可 —— 也可以粘贴路径，或直接输入它自动扫描到的候选编号
+   （会自动搜 `~/storage/downloads`、`~/Downloads`、`Desktop`、当前目录等）
+3. **按内容校验**格式对不对，不只看后缀：
+   - exe → PE 头 + 架构 + 子系统
+   - apk → 是否含 `AndroidManifest.xml` / `classes.dex`
+   - ipa → 是否含 `Payload/`
+   - dmg → 尾部 `koly` 签名
+4. 汇总确认 → 自动放入 `payloads/` → 自动调用 `build.sh` → 自动校验
+5. 可选：自动 `git add / commit / push`，以及打 tag 发 Release
+
+参数：`--skip-build`（只放文件不打包）、`--skip-git`（不提示提交）
+
 ## 可配置项
 
 | 变量 | 默认值 | 说明 |

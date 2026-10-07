@@ -1,6 +1,6 @@
 OUT ?= Tool.exe
 
-.PHONY: all build verify clean
+.PHONY: all build verify wizard clean
 
 all: build
 
@@ -9,6 +9,9 @@ build:
 
 verify:
 	python3 scripts/verify.py $(OUT)
+
+wizard:
+	python3 scripts/wizard.py
 
 clean:
 	rm -rf build $(OUT) $(OUT).sha256
