@@ -74,6 +74,19 @@ Tool.exe --sfx-extract D:\out
 
 只解压不运行，用于确认包是否完整。
 
+## 冒烟测试（CI 自动跑）
+
+workflow 里除了打包，还有两条自动化验证：
+
+1. **打包**（ubuntu-latest）
+   `payloads/` 里有产物时才构建、校验、上传产物；打 tag 时额外发 Release。
+   负载为空只给 warning，**不会让 CI 变红**（方便模板刚建好时先跑通）。
+
+2. **冒烟测试**（ubuntu 造包 → windows 实跑）
+   现场造一个假入口程序打进包，在**真实的 Windows runner** 上运行生成的 `Smoke.exe`，
+   断言它确实完成了解压并启动了入口程序。
+   这一步专门守护"双击 → 自解压 → 启动"这条链路，防止脚本改坏了没人发现。
+
 ## 常见问题
 
 **Q：杀软 / SmartScreen 报毒怎么办？**

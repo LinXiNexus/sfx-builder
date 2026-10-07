@@ -3,7 +3,8 @@
 // 引导程序：定位自身文件尾部的压缩包 -> 解压 -> 运行入口程序。
 //
 // 排障用法（命令行）：
-//   Tool.exe --sfx-extract [目标目录]     只解压不运行
+//
+//	Tool.exe --sfx-extract [目标目录]     只解压不运行
 //
 // markerStr / entryPath 由 scripts/build.sh 通过 -ldflags "-X main.xxx=yyy" 注入。
 package main

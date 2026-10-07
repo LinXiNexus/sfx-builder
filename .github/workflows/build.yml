@@ -15,12 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OUT_NAME: Tool.exe        # 产物文件名（建议 ASCII，避免 URL 编码麻烦）
+  OUT_NAME: Tool.exe        # 产物文件名（建议 ASCII）
   ENTRY: windows/app.exe    # Windows 端解压后要运行的程序
   STUB_ARCH: 386            # 386 = 32/64 位 Windows 通用；amd64 体积略小但只支持 64 位
 
 jobs:
+  # ── 打包 ─────────────────────────────────────────────────────────
   build:
+    name: 打包单文件
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
@@ -39,19 +41,30 @@ jobs:
       #     name: platform-builds
       #     path: payloads
 
-      - name: 查看负载目录
-        run: find payloads -type f -not -name '.gitkeep' -not -name 'README.md' | sort
+      - name: 检查负载目录
+        id: payloads
+        run: |
+          find payloads -type f -not -name '.gitkeep' -not -name 'README.md' | sort
+          n=$(find payloads -type f -not -name '.gitkeep' -not -name 'README.md' | wc -l)
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          if [ "$n" -eq 0 ]; then
+            echo "::warning::payloads/ 里还没有产物，跳过打包；放入 windows/app.exe 等文件后会自动开始构建"
+          fi
 
       - name: 构建单文件
+        if: steps.payloads.outputs.count != '0'
         run: bash scripts/build.sh
 
       - name: 校验产物
+        if: steps.payloads.outputs.count != '0'
         run: python3 scripts/verify.py "$OUT_NAME"
 
       - name: 生成校验和
+        if: steps.payloads.outputs.count != '0'
         run: sha256sum "$OUT_NAME" | tee "$OUT_NAME.sha256"
 
       - name: 上传构建产物
+        if: steps.payloads.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: single-file-package
@@ -62,10 +75,72 @@ jobs:
           retention-days: 14
 
       - name: 发布 Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && steps.payloads.outputs.count != '0'
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ${{ env.OUT_NAME }}
             ${{ env.OUT_NAME }}.sha256
           generate_release_notes: true
+
+  # ── 冒烟测试：ubuntu 上造包 ───────────────────────────────────────
+  smoke-build:
+    name: 冒烟测试（构建）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.20.14'
+          cache: false
+
+      - name: 生成假入口程序
+        run: |
+          GOOS=windows GOARCH=386 CGO_ENABLED=0 go build \
+            -trimpath -ldflags "-H windowsgui -s -w" \
+            -o payloads/windows/app.exe ./smoke
+
+      - name: 打包
+        env:
+          OUT_NAME: Smoke.exe
+        run: bash scripts/build.sh
+
+      - name: 校验
+        run: python3 scripts/verify.py Smoke.exe
+
+      - name: 上传冒烟包
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-package
+          path: Smoke.exe
+          retention-days: 3
+
+  # ── 冒烟测试：真实 Windows 上跑 ──────────────────────────────────
+  smoke-run:
+    name: 冒烟测试（Windows 实跑）
+    needs: smoke-build
+    runs-on: windows-latest
+    steps:
+      - name: 下载冒烟包
+        uses: actions/download-artifact@v4
+        with:
+          name: smoke-package
+
+      - name: 运行并断言
+        shell: pwsh
+        run: |
+          $marker = Join-Path $env:TEMP "sfx-smoke-ok.txt"
+          Remove-Item $marker -ErrorAction SilentlyContinue
+          $env:SFX_SMOKE_OUT = $marker
+
+          # 引导程序是 GUI 子系统，PowerShell 不会自动等待，必须用 -Wait
+          $p = Start-Process -FilePath ".\Smoke.exe" -PassThru -Wait
+          Write-Host "引导程序退出码: $($p.ExitCode)"
+
+          if (-not (Test-Path $marker)) {
+            throw "冒烟测试失败：入口程序没有被执行（未生成 $marker）"
+          }
+          Write-Host "入口程序写出的内容："
+          Get-Content $marker | ForEach-Object { Write-Host "  $_" }
+          Write-Host "OK 全链路正常：Smoke.exe -> 自解压 -> 启动入口程序"
