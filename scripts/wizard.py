@@ -73,7 +73,7 @@ PLATFORMS = [
         "key": "android",
         "title": "安卓",
         "target": "android/app.apk",
-        "exts": [".apk"],
+        "exts": [".apk", ".aab", ".apks", ".xapk"],
         "hint": "安卓安装包（用户改后缀为 .zip 解压后安装）",
         "required": False,
     },
@@ -149,11 +149,29 @@ def deep_check(p: Path, key: str) -> tuple[bool, str]:
                 with zipfile.ZipFile(p) as z:
                     names = z.namelist()
                 if key == "android":
-                    has_manifest = "AndroidManifest.xml" in names
-                    has_dex = any(n.startswith("classes") and n.endswith(".dex") for n in names)
-                    if not (has_manifest or has_dex):
-                        return False, "ZIP 里没有 AndroidManifest.xml / classes.dex，不像 APK"
-                    return True, f"APK · {len(names)} 个条目"
+                    # AAB（App Bundle）不是 APK，装不了
+                    if "BundleConfig.pb" in names or any(n.startswith("base/manifest/") for n in names):
+                        return False, "这是 AAB（App Bundle），不能直接安装；请用 bundletool 转成 APK"
+
+                    # XAPK / APKS 这类分卷包，内含多个 apk，也不是单个 APK
+                    inner = [n for n in names if n.lower().endswith(".apk")]
+                    if inner and "AndroidManifest.xml" not in names:
+                        return False, f"这是分卷安装包（内含 {len(inner)} 个 apk），不是单个 APK"
+
+                    # 正规 APK：根目录必须有 AndroidManifest.xml
+                    if "AndroidManifest.xml" not in names:
+                        return False, "根目录没有 AndroidManifest.xml，不像 APK"
+
+                    # dex 是可选的：hasCode=false 的应用、config split、加固包都可能没有
+                    dexes = [n for n in names if n.endswith(".dex")]
+                    note = f"APK · {len(names)} 个条目 · dex {len(dexes)} 个"
+                    if not dexes:
+                        note += "（无 dex 属正常：纯资源应用 / 分卷 / 加固包）"
+                    elif not any(n.startswith("classes") for n in dexes):
+                        note += "（dex 不在根目录，可能是加固包）"
+                    if not dexes and "resources.arsc" not in names:
+                        note += "；⚠ 无 dex 也无 resources.arsc，可能是不完整的分卷包"
+                    return True, note
                 if key == "ios":
                     if not any(n.startswith("Payload/") for n in names):
                         return False, "ZIP 里没有 Payload/ 目录，不像 IPA"

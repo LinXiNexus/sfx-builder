@@ -38,7 +38,9 @@ python3 scripts/wizard.py     # 或 make wizard
    （会自动搜 `~/storage/downloads`、`~/Downloads`、`Desktop`、当前目录等）
 3. **按内容校验**格式对不对，不只看后缀：
    - exe → PE 头 + 架构 + 子系统
-   - apk → 是否含 `AndroidManifest.xml` / `classes.dex`
+   - apk → 根目录的 `AndroidManifest.xml`（**dex 是可选的**：`hasCode=false` 的纯资源应用、
+     App Bundle 拆出的 config split、把 dex 藏进 assets 的加固包，都可能没有 dex）
+   - apk → 还会拦下装不了的包：**AAB**（App Bundle，需 bundletool 转 APK）、**XAPK / APKS 分卷包**
    - ipa → 是否含 `Payload/`
    - dmg → 尾部 `koly` 签名
 4. 汇总确认 → 自动放入 `payloads/` → 自动调用 `build.sh` → 自动校验
