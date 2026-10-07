@@ -1,6 +1,10 @@
 //go:build windows
 
-// 引导程序：定位自身文件尾部的压缩包 -> 解压到临时目录 -> 运行入口程序。
+// 引导程序：定位自身文件尾部的压缩包 -> 解压 -> 运行入口程序。
+//
+// 排障用法（命令行）：
+//   Tool.exe --sfx-extract [目标目录]     只解压不运行
+//
 // markerStr / entryPath 由 scripts/build.sh 通过 -ldflags "-X main.xxx=yyy" 注入。
 package main
 
@@ -30,31 +34,29 @@ func main() {
 }
 
 func run() error {
-	self, err := os.Executable()
+	zr, err := openPayload()
 	if err != nil {
 		return err
 	}
-	blob, err := os.ReadFile(self)
-	if err != nil {
-		return err
+	args := os.Args[1:]
+
+	// 排障用法：只解压不运行
+	if len(args) > 0 && args[0] == "--sfx-extract" {
+		out := filepath.Join(filepath.Dir(selfPath()), "Tool-data")
+		if len(args) > 1 {
+			out = args[1]
+		}
+		if err := os.MkdirAll(out, 0o755); err != nil {
+			return err
+		}
+		if err := extractAll(zr, out); err != nil {
+			return err
+		}
+		msgBox("已解压到：\n" + out)
+		return nil
 	}
 
-	marker := []byte(markerStr)
-	// 用 marker + ZIP 本地文件头 "PK\x03\x04" 定位负载：
-	// 即使引导程序自己的二进制里出现同样的 marker 字符串也不会误判。
-	needle := append(append([]byte{}, marker...), 'P', 'K', 3, 4)
-	i := bytes.Index(blob, needle)
-	if i < 0 {
-		return fmt.Errorf("未找到内置负载（文件可能被截断或被安全软件改写）")
-	}
-	payload := blob[i+len(marker):]
-
-	zr, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
-	if err != nil {
-		return fmt.Errorf("负载损坏：%w", err)
-	}
-
-	dir, err := os.MkdirTemp("", "sfx-")
+	dir, err := workDir()
 	if err != nil {
 		return err
 	}
@@ -68,9 +70,51 @@ func run() error {
 		return nil
 	}
 
-	cmd := exec.Command(target, os.Args[1:]...)
+	cmd := exec.Command(target, args...)
 	cmd.Dir = filepath.Dir(target)
 	return cmd.Run()
+}
+
+// openPayload 读取自身文件，定位内嵌的 ZIP 负载。
+func openPayload() (*zip.Reader, error) {
+	blob, err := os.ReadFile(selfPath())
+	if err != nil {
+		return nil, err
+	}
+	marker := []byte(markerStr)
+	// 用 marker + ZIP 本地文件头 "PK\x03\x04" 定位负载：
+	// 即使引导程序自己的二进制里出现同样的 marker 字符串也不会误判。
+	needle := append(append([]byte{}, marker...), 'P', 'K', 3, 4)
+	i := bytes.Index(blob, needle)
+	if i < 0 {
+		return nil, fmt.Errorf("未找到内置负载（文件可能被截断或被安全软件改写）")
+	}
+	payload := blob[i+len(marker):]
+	zr, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("负载损坏：%w", err)
+	}
+	return zr, nil
+}
+
+// workDir 优先使用系统临时目录；不可写时退回 exe 同目录的 Tool-data/。
+func workDir() (string, error) {
+	if d, err := os.MkdirTemp("", "sfx-"); err == nil {
+		return d, nil
+	}
+	base := filepath.Join(filepath.Dir(selfPath()), "Tool-data")
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return "", err
+	}
+	return os.MkdirTemp(base, "sfx-")
+}
+
+func selfPath() string {
+	self, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	return self
 }
 
 func extractAll(zr *zip.Reader, dir string) error {

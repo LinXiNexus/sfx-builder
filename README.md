@@ -45,6 +45,35 @@ Tool.exe = [PE 引导程序 stub] + [marker] + [ZIP 负载]
 Windows 只认开头的 PE；ZIP 的目录信息在文件尾部，所以同一个文件既能被 Windows 执行，
 又能被 7-Zip / WinRAR / ZArchiver / MT管理器 当作压缩包打开（这类"前置数据"绝大多数解压工具都支持）。
 
+## 兼容性
+
+| 平台 | 支持情况 | 用户操作 |
+|---|---|---|
+| Windows 7 SP1 / 8 / 10 / 11（32 位、64 位、ARM64） | ✅ 双击即用 | 无需操作 |
+| Android 4.0+ | ✅ | 改后缀为 `.zip`，用 ZArchiver / MT管理器 / RAR 解压 |
+| macOS / Linux | ✅ | 改后缀为 `.zip` 解压 |
+| iOS / iPadOS | ⚠️ 需签名渠道 | 解压取出 `.ipa`，用 AltStore / 企业签 / TestFlight 安装 |
+
+**为兼容性做的取舍**
+
+- 引导程序按 **32 位（GOARCH=386）** 编译：一个二进制同时兼容 32/64 位 Windows，ARM64 也能模拟运行
+- Go 固定 **1.20.x**：最后一个支持 Windows 7/8 的版本；只面向 Win10+ 可升到最新
+- 负载用 **ZIP**（而非 7z）：Windows / Android / macOS 的通用解压工具都能识别
+- `使用说明.txt` 打包时自动转为 **UTF-8 BOM + CRLF**：老版本 Windows 记事本也能正常显示中文
+- 包内目录名保持 **ASCII**（`windows/` `android/` …），避免文件名编码问题
+- 单文件超过 **4 GiB** 会启用 ZIP64，个别老旧解压工具不支持（构建时会给出提示）
+- 解压目录优先用系统临时目录，不可写时自动退回 exe 同目录的 `Tool-data/`
+
+**排障**
+
+Windows 上双击没反应时，可命令行执行：
+
+```bat
+Tool.exe --sfx-extract D:\out
+```
+
+只解压不运行，用于确认包是否完整。
+
 ## 常见问题
 
 **Q：杀软 / SmartScreen 报毒怎么办？**

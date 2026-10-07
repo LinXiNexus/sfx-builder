@@ -17,7 +17,7 @@ concurrency:
 env:
   OUT_NAME: Tool.exe        # 产物文件名（建议 ASCII，避免 URL 编码麻烦）
   ENTRY: windows/app.exe    # Windows 端解压后要运行的程序
-  STUB_ARCH: amd64          # amd64 / 386
+  STUB_ARCH: 386            # 386 = 32/64 位 Windows 通用；amd64 体积略小但只支持 64 位
 
 jobs:
   build:
@@ -29,7 +29,7 @@ jobs:
       - name: 安装 Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.20.14'   # 最后一个支持 Windows 7/8 的版本；只发 Win10+ 可改最新
           cache: false
 
       # 若各平台产物来自别的 workflow，取消下面注释自动拉取
