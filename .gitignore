@@ -1,0 +1,15 @@
+# 构建产物
+/build/
+/Tool.exe
+*.sha256
+
+# 可选：让负载二进制不入库（启用后改用 CI 拉取产物，见 README）
+# /payloads/**/*.exe
+# /payloads/**/*.apk
+# /payloads/**/*.ipa
+# /payloads/**/*.dmg
+# /payloads/**/*.AppImage
+
+# Python 缓存
+__pycache__/
+*.pyc

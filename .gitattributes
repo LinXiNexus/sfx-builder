@@ -1,0 +1,9 @@
+*.exe binary
+*.apk binary
+*.ipa binary
+*.zip binary
+*.7z  binary
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf

@@ -1,0 +1,22 @@
+【XX 工具 使用说明】
+本文件是一个多平台合并包（文件名：Tool.exe）
+
+■ Windows
+  直接双击运行。
+  若提示"未知发布者 / Windows 已保护你的电脑"，点"更多信息 → 仍要运行"。
+
+■ 安卓
+  1) 把文件名 Tool.exe 改成 Tool.zip
+  2) 用 ZArchiver / MT管理器 / RAR 打开并解压
+     （部分手机自带文件管理器打不开这种包，请用上面推荐的 App）
+  3) 安装解压出来的 android/app.apk
+
+■ iPhone / iPad
+  1) 改名 Tool.zip 解压，取出 ios/App.ipa
+  2) 用 AltStore / Sideloadly 安装，或访问我们的 TestFlight / 签名安装链接
+     （iOS 不允许直接安装未签名 IPA，这一步省不掉）
+
+■ macOS / Linux
+  改名 Tool.zip 解压，运行对应目录里的程序
+
+校验和（SHA256）见发布页同名 .sha256 文件。
